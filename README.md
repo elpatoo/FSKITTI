@@ -1,4 +1,4 @@
-# 🏎️ FSKITTI: Multi-Modal 3D Object Detection Dataset for Formula Student
+# FSKITTI: Multi-Modal 3D Object Detection Dataset for Formula Student 🏎️ 
 
 **FSKITTI** is a multi-modal 3D object detection dataset tailored for the perception challenges of autonomous Formula Student race cars. It follows the official KITTI format and includes LiDAR point clouds, RGB camera images, 3D bounding boxes, and calibration files. The dataset was created from synchronized ROS bags collected by FST Lisboa’s autonomous system and is intended to support and benchmark both monocular and sensor-fusion-based perception pipelines.
 
@@ -114,7 +114,7 @@ If you use this dataset in your research or experiments, please cite the followi
 
 ```
 @mastersthesis{valverde2025fskitti,
-  title     = {3D Object Detection for Formula Student Autonomous Cars: Dataset and Benchmarks},
+  title     = {Comparing Different Approaches for the Perception of an Autonomous Formula Student Car},
   author    = {Miguel Valverde},
   school    = {Instituto Superior Técnico},
   year      = {2025},
