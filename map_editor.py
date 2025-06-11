@@ -107,7 +107,7 @@ class SceneGenerator:
         yolo_iou_thresh: float = 0.45,
         yolo_device: str = "cpu",
         yolo_half: bool = False,
-        max_img_lag: float = 0.1,
+        max_img_lag: float = 0.05,
     ):
         self.selected_file = selected_file
         self.label_every = label_every
@@ -190,31 +190,42 @@ class SceneGenerator:
         return []
 
     def _get_closest_image(self, stamp) -> Optional[np.ndarray]:
-        ts = stamp.to_sec()
+        """
+        Find the single image whose timestamp is closest to `stamp`,
+        regardless of whether it’s within max_img_lag or not. After
+        scanning every image, return the one with minimum |lag|.
+        If that minimum lag > max_img_lag, return None.
+        """
+        ts_target = stamp.to_sec()
         best_img = None
         best_lag = float("inf")
+
         try:
             with rosbag.Bag(self.selected_file, 'r') as bag:
                 for _, msg, _ in bag.read_messages(topics=[IMAGE_TOPIC]):
-                    t = msg.header.stamp.to_sec()
-                    lag = abs(t - ts)
+                    t_img = msg.header.stamp.to_sec()
+                    lag = abs(t_img - ts_target)
+
+                    # If this image is closer than any we’ve seen, keep it
                     if lag < best_lag:
                         try:
-                            img = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-                            best_img = img
+                            # convert ROS Image → CV2
+                            img_cv = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+                            best_img = img_cv
                             best_lag = lag
-                        except Exception:
+                        except CvBridgeError:
                             continue
-                    if lag < self.max_img_lag:
-                        break
+
+                # End of loop: we have scanned every image in the bag
         except Exception as e:
-            print(f"[ERROR] Lazy image load failed: {e}")
+            print(f"[ERROR] Failed to scan images for closest match: {e}")
             return None
 
+        # If the best‐found image is still within the allowed max_img_lag, return it
         if best_lag <= self.max_img_lag:
-            print(f"[DEBUG] Closest image lag: {best_lag:.3f}s (allowed: {self.max_img_lag:.3f}s)")
             return best_img
-        print("[DEBUG] Image too far in time, skipping.")
+
+        # Otherwise, no image close enough → return None
         return None
 
     def _get_pose_matrix_at(self, query_t: float) -> np.ndarray:
@@ -638,7 +649,7 @@ class MapEditor:
         yolo_iou_thresh: float = 0.45,
         yolo_device: str = "cpu",
         yolo_half: bool = False,
-        max_img_lag: float = 0.1,
+        max_img_lag: float = 0.05,
     ):
         # exactly your original MapEditor.__init__, no removals
         self.cones: List[Tuple[float, float, int]] = []
@@ -692,7 +703,7 @@ class MapEditor:
         yolo_iou_thresh: float = 0.45,
         yolo_device: str = "cpu",
         yolo_half: bool = False,
-        max_img_lag: float = 0.1,
+        max_img_lag: float = 0.05,
     ):
         self.cones: List[Tuple[float, float, int]] = []
         self.selected_cones: Set[Tuple[float, float, int]] = set()
