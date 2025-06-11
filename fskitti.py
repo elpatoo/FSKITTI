@@ -5,7 +5,7 @@ import numpy as np
 
 # Configuration
 BASE_DIR = './fskitti'
-DEST_DIR = '../bags/dataset7'
+DEST_DIR = '../bags/dataset8'
 SEED = 42
 TRAIN_RATIO = 0.8
 
@@ -15,6 +15,7 @@ SELECTED_SCENES = [
     'camera_central_noise_rain',
     'camera_estoril_autox1',
     'camera_estoril_autox2',
+   # 'camera_thesis_alverca_skidpad'
 ]
 
 # Sensor parameters
@@ -27,23 +28,30 @@ extrinsic_flat = [0.0272532712, -0.9996134758, -0.0054916535, -0.0421333031,
                   0.0050777668,  0.0056320583, -0.9999712477, -0.0401744490,
                   0.9996156639,  0.0272246023,  0.0052292962, 0.1868387551]
 
-# Apply this transform to labels (camera → LiDAR)
-Tr_cam_to_velo_flat = [
-    2.724863572788e-02, 5.078531761189e-03, 9.996115295122e-01, -1.854154276620e-01,
-   -9.996171936318e-01, 5.630430123155e-03, 2.722130823764e-02, -4.697373325411e-02,
-   -5.489593859584e-03, -9.999724951106e-01, 5.231435820347e-03, -4.137761057334e-02
-]
-R_cam_to_velo = np.array(Tr_cam_to_velo_flat).reshape(3, 4)[:, :3]
-t_cam_to_velo = np.array(Tr_cam_to_velo_flat).reshape(3, 4)[:, 3]
+ext_matrix_rot = [-0.028513661350487, -0.999372268994208, 0.021024725485918, 0.112705030407873, 
+                    -0.003409584841331, -0.020935917420255, -0.999775005735281, -0.056709728245902,
+                    0.999587587881922,  -0.028578931525527,  -0.002810484879827 , 0.006342076987547]
 
-# Calibration content formatting
-fmt = lambda row, t: ' '.join(f"{v:.12e}" for v in row) + f" {t:.12e}"
-K = [intrinsic_flat[0:3], intrinsic_flat[3:6], intrinsic_flat[6:9]]
-P_lines = [f"P{i}: " + fmt(K[0], 0.0) + ' ' + fmt(K[1], 0.0) + ' ' + fmt(K[2], 0.0) for i in range(4)]
-R0 = "R0_rect: " + ' '.join(f"{v:.12e}" for v in [1,0,0, 0,1,0, 0,0,1])
-Tr = "Tr_velo_to_cam: " + ' '.join(f"{v:.12e}" for v in extrinsic_flat)
-Tr_imu = "Tr_imu_to_velo: " + ' '.join(f"{v:.12e}" for v in [1,0,0,0, 0,1,0,0, 0,0,1,0])
-CALIB_CONTENT = '\n'.join(P_lines + [R0, Tr, Tr_imu]) + '\n'
+# Calibration transformation matrix: LiDAR → Camera
+Tr_velo_to_cam_flat = [-0.028513661350487, -0.999372268994208, 0.021024725485918, 0.112705030407873, 
+                    -0.003409584841331, -0.020935917420255, -0.999775005735281, -0.056709728245902,
+                    0.999587587881922,  -0.028578931525527,  -0.002810484879827 , 0.006342076987547]
+
+# Decompose into R and t
+R_velo_to_cam = np.array(Tr_velo_to_cam_flat).reshape(3, 4)[:, :3]
+t_velo_to_cam = np.array(Tr_velo_to_cam_flat).reshape(3, 4)[:, 3]
+
+# Prepare calibration text block
+def generate_calib_file(intrinsic_flat, extrinsic_flat):
+    fmt = lambda row, t: ' '.join(f"{v:.12e}" for v in row) + f" {t:.12e}"
+    K = [intrinsic_flat[0:3], intrinsic_flat[3:6], intrinsic_flat[6:9]]
+    P_lines = [f"P{i}: " + fmt(K[0], 0.0) + ' ' + fmt(K[1], 0.0) + ' ' + fmt(K[2], 0.0) for i in range(4)]
+    R0 = "R0_rect: " + ' '.join(f"{v:.12e}" for v in [1,0,0, 0,1,0, 0,0,1])
+    Tr = "Tr_velo_to_cam: " + ' '.join(f"{v:.12e}" for v in extrinsic_flat)
+    Tr_imu = "Tr_imu_to_velo: " + ' '.join(f"{v:.12e}" for v in [1,0,0,0, 0,1,0,0, 0,0,1,0])
+    return '\n'.join(P_lines + [R0, Tr, Tr_imu]) + '\n'
+
+CALIB_CONTENT = generate_calib_file(intrinsic_flat, extrinsic_flat)
 
 # Prepare directories
 splits = {
@@ -89,14 +97,14 @@ train_frames = [global_frames[i] for i in indices if i in train_idx]
 test_frames  = [global_frames[i] for i in indices if i not in train_idx]
 print(f"Total={total}, train={len(train_frames)}, test={len(test_frames)}")
 
-# Transform 3D box from camera to LiDAR
-def transform_label_line_to_lidar(line):
+# Transformation function for label coordinates
+def transform_label_line_to_camera(line):
     parts = line.strip().split()
     if len(parts) < 15:
         return line
-    pos = np.array([float(parts[11]), float(parts[12]), float(parts[13])])
-    transformed = R_cam_to_velo @ pos + t_cam_to_velo
-    parts[11], parts[12], parts[13] = [f"{x:.6f}" for x in transformed]
+    pos_lidar = np.array([float(parts[11]), float(parts[12]), float(parts[13])])
+    pos_cam = R_velo_to_cam @ pos_lidar + t_velo_to_cam
+    parts[11], parts[12], parts[13] = [f"{x:.6f}" for x in pos_cam]
     return ' '.join(parts)
 
 # Copy function
@@ -106,7 +114,7 @@ def copy_frames(frames, split):
         shutil.copy(os.path.join(scene, 'images', img), os.path.join(DEST_DIR, split, 'image_2', nid + '.png'))
         if split == 'training':
             with open(os.path.join(scene, 'labels', lbl), 'r') as f_in:
-                transformed_lines = [transform_label_line_to_lidar(line) for line in f_in]
+                transformed_lines = [transform_label_line_to_camera(line) for line in f_in]
             with open(os.path.join(DEST_DIR, split, 'label_2', nid + '.txt'), 'w') as f_out:
                 f_out.write('\n'.join(transformed_lines) + '\n')
         shutil.copy(os.path.join(scene, 'points', pcd), os.path.join(DEST_DIR, split, 'velodyne', nid + '.bin'))

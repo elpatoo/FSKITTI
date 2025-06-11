@@ -93,7 +93,7 @@ class SceneGenerator:
         lidar_freq: float = 20.0,
         min_range: float = 2.0,
         max_range: float = 20.0,
-        expansion_coeff: float = 0.15,
+        expansion_coeff: float = 0.1,
         centroid_correction: bool = False,
         cluster_radius: float = 0.5,
         min_cluster_points: int = 5,
@@ -563,13 +563,36 @@ class SceneGenerator:
             with open(label_path, 'w') as lf:
                 for x, y, c, dims in cones:
                     h, w, l = dims[2], dims[0], dims[1]
-                    z = dims[2]/2 - self.lidar_z_offset
+                    margin = 0.05  # 5% downward margin
+
+                    # Define the XY bounds of the box footprint
+                    min_x = x - l / 2
+                    max_x = x + l / 2
+                    min_y = y - w / 2
+                    max_y = y + w / 2
+
+                    # Find points inside the XY footprint
+                    mask = (
+                        (pcd[:, 0] >= min_x) & (pcd[:, 0] <= max_x) &
+                        (pcd[:, 1] >= min_y) & (pcd[:, 1] <= max_y)
+                    )
+                    points_in_box = pcd[mask]
+
+                    if len(points_in_box) > 0:
+                        min_z = np.min(points_in_box[:, 2])
+                        adjusted_bottom_z = min_z - h * margin
+                        z = adjusted_bottom_z + h / 2
+                    else:
+                        # fallback if no points are found
+                        z = h / 2 - self.lidar_z_offset
+
                     print(f"[DEBUG] Writing KITTI label with cone pos: ({x:.2f}, {y:.2f}, {z:.2f})")
                     lf.write(
                         f"{LABEL_NAME[c]} 0.00 0 0.00 0.00 0.00 0.00 0.00 "
                         f"{h:.3f} {w:.3f} {l:.3f} "
                         f"{x:.3f} {y:.3f} {z:.3f} 0.00\n"
                     )
+
                 for *box, conf, cls_id in dets:
                     x1, y1, x2, y2 = map(float, box)
                     x1 *= scale_x
@@ -689,7 +712,7 @@ class MapEditor:
         label_every: int = 400,
         min_range: float = 2.0,
         max_range: float = 20.0,
-        expansion_coeff: float = 0.15,
+        expansion_coeff: float = 0.1,
         centroid_correction: bool = False,
         cluster_radius: float = 0.5,
         min_cluster_points: int = 5,
@@ -899,7 +922,7 @@ def main():
     parser.add_argument("--label-every",        type=int,   default=20)
     parser.add_argument("--min-range",          type=float, default=2.0)
     parser.add_argument("--max-range",          type=float, default=40.0)
-    parser.add_argument("--expansion-coeff",    type=float, default=0.15)
+    parser.add_argument("--expansion-coeff",    type=float, default=0.1)
     parser.add_argument("--centroid-correction",action="store_true")
     parser.add_argument("--cluster-radius",     type=float, default=0.5,
                         help="radius around expected cone for cluster centroid")
