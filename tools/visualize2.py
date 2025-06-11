@@ -1,3 +1,5 @@
+# Python script to apply a fixed z-offset to KITTI .bin point clouds and visualize with Open3D
+
 import numpy as np
 import open3d as o3d
 import matplotlib.pyplot as plt
@@ -14,17 +16,6 @@ def build_colored_pointcloud(pts):
     colors = plt.get_cmap('cividis')(zs_normalized)[:, :3]
     pc.colors = o3d.utility.Vector3dVector(colors)
     return pc
-
-def estimate_ground_plane(pcd, threshold=0.05, ransac_n=3, num_iters=1000):
-    plane_model, inliers = pcd.segment_plane(
-        distance_threshold=threshold,
-        ransac_n=ransac_n,
-        num_iterations=num_iters
-    )
-    [a, b, c, d] = plane_model
-    ground_points = np.asarray(pcd.points)[inliers]
-    ground_z = ground_points[:, 2].mean()
-    return ground_z, inliers, plane_model
 
 def load_labels(label_path):
     boxes = []
@@ -52,48 +43,37 @@ def create_box(center, size, color):
     return box
 
 def main():
+    # paths to your data
     bin_path = "fskitti/camera_estoril_autox1/points/0000000.bin"
     label_path = "fskitti/camera_estoril_autox1/labels/0000000.txt"
 
-    # Load raw point cloud (no offset yet)
-    raw_pts = load_point_cloud(bin_path)
-    raw_pcd = build_colored_pointcloud(raw_pts)
+    # load and build original point cloud
+    pts = load_point_cloud(bin_path)
 
-    # Estimate ground plane
-    ground_z, inliers, _ = estimate_ground_plane(raw_pcd)
-    print(f"[INFO] Estimated ground Z level: {ground_z:.3f} m")
-    print(f"[INFO] Applying lidar_z_offset = {-ground_z:.3f} m")
+    # apply fixed offset (e.g., raise/lower z by constant)
+    lidar_z_offset = -0.15  # adjust this value as needed
+    pts[:, 2] += lidar_z_offset
 
-    # Apply offset to bring ground to z=0
-    lidar_z_offset = -0.15
-    raw_pts[:, 2] += lidar_z_offset
+    # rebuild point cloud with color by height
+    pcd = build_colored_pointcloud(pts)
 
-    # Rebuild final point cloud
-    pcd = build_colored_pointcloud(raw_pts)
-
-    # Highlight inlier ground points in white
-    inlier_cloud = pcd.select_by_index(inliers)
-    inlier_cloud.paint_uniform_color([1, 1, 1])
-
-    # Load labels and boxes
+    # load labels and generate boxes
     boxes = load_labels(label_path)
-    vis_geometries = [pcd, inlier_cloud]
-
     color_map = {
         'blue_cone':   (0, 0, 1),
         'yellow_cone': (1, 1, 0),
         'orange_cone': (1, 0.5, 0),
         'large_orange_cone': (0.5, 0, 0.5),
     }
-
+    geoms = [pcd]
     for box in boxes:
         color = color_map.get(box['label'], (0.5, 0.5, 0.5))
-        vis_geometries.append(create_box(box['center'], box['size'], color))
+        geoms.append(create_box(box['center'], box['size'], color))
 
-    # Fast Open3D viewer
+    # visualize
     vis = o3d.visualization.Visualizer()
-    vis.create_window("KITTI Preview with Auto Ground Offset", width=900, height=600)
-    for g in vis_geometries:
+    vis.create_window("PointCloud with Fixed Z-Offset", width=900, height=600)
+    for g in geoms:
         vis.add_geometry(g)
     opt = vis.get_render_option()
     opt.point_size = 2.0

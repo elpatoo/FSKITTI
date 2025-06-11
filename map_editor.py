@@ -88,12 +88,12 @@ class SceneGenerator:
         selected_file: str,
         label_every: int = 10,
         ego_motion_compensate: bool = True,
-        lidar_z_offset: float = 1.15,
+        lidar_z_offset: float = 0.15,
         visualize: bool = False,
         lidar_freq: float = 20.0,
         min_range: float = 2.0,
         max_range: float = 20.0,
-        expansion_coeff: float = 0.0,
+        expansion_coeff: float = 0.15,
         centroid_correction: bool = False,
         cluster_radius: float = 0.5,
         min_cluster_points: int = 5,
@@ -636,7 +636,7 @@ class MapEditor:
         label_every: int = 400,
         min_range: float = 2.0,
         max_range: float = 20.0,
-        expansion_coeff: float = 0.0,
+        expansion_coeff: float = 0.15,
         centroid_correction: bool = False,
         cluster_radius: float = 0.5,
         min_cluster_points: int = 5,
@@ -689,7 +689,7 @@ class MapEditor:
         label_every: int = 400,
         min_range: float = 2.0,
         max_range: float = 20.0,
-        expansion_coeff: float = 0.0,
+        expansion_coeff: float = 0.15,
         centroid_correction: bool = False,
         cluster_radius: float = 0.5,
         min_cluster_points: int = 5,
@@ -862,7 +862,7 @@ class MapEditor:
             self.selected_file,
             self.label_every,
             ego_motion_compensate=True,
-            lidar_z_offset=1.15,
+            lidar_z_offset=0.15,
             visualize=self.visualize.get(),
             lidar_freq=20.0,
             min_range=self.min_range,
@@ -899,7 +899,7 @@ def main():
     parser.add_argument("--label-every",        type=int,   default=20)
     parser.add_argument("--min-range",          type=float, default=2.0)
     parser.add_argument("--max-range",          type=float, default=40.0)
-    parser.add_argument("--expansion-coeff",    type=float, default=0.1)
+    parser.add_argument("--expansion-coeff",    type=float, default=0.15)
     parser.add_argument("--centroid-correction",action="store_true")
     parser.add_argument("--cluster-radius",     type=float, default=0.5,
                         help="radius around expected cone for cluster centroid")
